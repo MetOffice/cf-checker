@@ -148,9 +148,10 @@ class ConstructDict(ContentHandler):
             ctime = self.dict['__contentTime__']
             self.current = (now-ctime) < 600
           else:
-            self.dict['__contentTime__'] = now
             self.current = False
           if self.current:
+            self.dict['__contentTime__'] = now
+          else:
             self.version_number,self.last_modified = self.dict['__info__']
 
         else:
@@ -255,10 +256,11 @@ class ConstructList(ContentHandler):
             ctime = self.list['__contentTime__']
             self.current = (now-ctime) < 600
           else:
-            self.list['__contentTime__'] = now
             self.current = False
           if self.current:
             self.version_number,self.last_modified = self.list['__info__']
+          else:
+            self.list['__contentTime__'] = now
 
         else:
           self.list = set()
