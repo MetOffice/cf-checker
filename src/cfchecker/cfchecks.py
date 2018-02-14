@@ -4,16 +4,18 @@
 #
 # Author: Rosalyn Hatcher - Met Office, UK
 #
+# Branch: branched to test table caching for improved execution speed, by Martin Juckes, Feb. 14th 2018.
+#
 # Maintainer: Rosalyn Hatcher - NCAS-CMS, Univ. of Reading, UK
 #
-# Date: February 2003
+# Date: February 2018
 #
 # File Revision: $Revision: 200 $
 #
 # CF Checker Version: See __version__
 #
 #-------------------------------------------------------------
-''' cfchecker [-a|--area_types area_types.xml] [-s|--cf_standard_names standard_names.xml] [-v|--version CFVersion] file1 [file2...]
+''' cfchecker [-a|--area_types area_types.xml] ['-x'|'--cache_tables'] [-s|--cf_standard_names standard_names.xml] [-v|--version CFVersion] file1 [file2...]
 
 Description:
  The cfchecker checks NetCDF files for compliance to the CF standard.
@@ -26,12 +28,14 @@ Options:
        the location of the CF standard name table (xml)
 
  -h or --help: Prints this help text.
+    
+ -x or --cache_tables: cache the standard name and area type tables.
 
  -v or --version: CF version to check against, use auto to auto-detect the file version.
 
 '''
 
-import sys
+import sys, os, time
 
 if sys.version_info[:2] < (2,7):
     from ordereddict import OrderedDict
@@ -118,19 +122,50 @@ newest_version = max(cfVersions)
 class ConstructDict(ContentHandler):
     """Parse the xml standard_name table, reading all entries
        into a dictionary; storing standard_name and units.
+ 
+       If useShelve is True, a python shelve file will be used. If the file is present and less than 600 seconds old, the
+       existing contents will be used, otherwise the standard name table will be parsed and written to the shelf file.
     """
-    def __init__(self):
+    def __init__(self,useShelve=False,shelveFile=None):
         self.inUnitsContent = 0
         self.inEntryIdContent = 0
         self.inVersionNoContent = 0
         self.inLastModifiedContent = 0
-        self.dict = {}
+        self.current = False
+        self.useShelve = useShelve
+
+        if useShelve:
+          import shelve
+          if shelveFile == None:
+            self.shFile = '/tmp/cfexpr_cache'
+          else:
+            self.shFile = shelveFile
+          now = time.time()
+          exists = os.path.isfile( self.shFile )
+          self.dict = shelve.open( self.shFile )
+
+          if exists:
+            ctime = self.dict['__contentTime__']
+            self.current = (now-ctime) < 600
+          else:
+            self.dict['__contentTime__'] = now
+            self.current = False
+          if self.current:
+            self.version_number,self.last_modified = self.dict['__info__']
+
+        else:
+          self.dict = {}
+        
+    def close(self):
+      if self.useShelve:
+        self.dict['__info__'] = (self.version_number,self.last_modified)
+        self.dict.close()
         
     def startElement(self, name, attrs):
         # If it's an entry element, save the id
         if name == 'entry':
             id = normalize_whitespace(attrs.get('id', ""))
-            self.this_id = id
+            self.this_id = str(id)
 
         # If it's the start of a canonical_units element
         elif name == 'canonical_units':
@@ -139,7 +174,7 @@ class ConstructDict(ContentHandler):
 
         elif name == 'alias':
             id = normalize_whitespace(attrs.get('id', ""))
-            self.this_id = id
+            self.this_id = str(id)
 
         elif name == 'entry_id':
             self.inEntryIdContent = 1
@@ -177,7 +212,7 @@ class ConstructDict(ContentHandler):
         # If it's the end of the entry_id element, find the units for the self.alias
         elif name == 'entry_id':
             self.inEntryIdContent = 0
-            self.entry_id = normalize_whitespace(self.entry_id)
+            self.entry_id = str( normalize_whitespace(self.entry_id) )
             try: 
                 self.dict[self.this_id] = self.dict[self.entry_id]
             except KeyError:
@@ -200,16 +235,48 @@ class ConstructList(ContentHandler):
     """Parse the xml area_type table, reading all area_types 
        into a list.
     """
-    def __init__(self):
+    def __init__(self,useShelve=False,shelveFile=None):
         self.inVersionNoContent = 0
         self.inLastModifiedContent = 0
-        self.list = []
+        self.current = False
+        self.useShelve = useShelve
+
+        if useShelve:
+          import shelve
+          if shelveFile == None:
+            self.shFile = '/tmp/cfexpr_cachel'
+          else:
+            self.shFile = shelveFile
+          now = time.time()
+          exists = os.path.isfile( self.shFile )
+          self.list = shelve.open( self.shFile )
+
+          if exists:
+            ctime = self.list['__contentTime__']
+            self.current = (now-ctime) < 600
+          else:
+            self.list['__contentTime__'] = now
+            self.current = False
+          if self.current:
+            self.version_number,self.last_modified = self.list['__info__']
+
+        else:
+          self.list = set()
+
+    def close(self):
+      if self.useShelve:
+        self.list['__info__'] = (self.version_number,self.last_modified)
+        self.list.close()
+        
         
     def startElement(self, name, attrs):
         # If it's an entry element, save the id
         if name == 'entry':
-            id = normalize_whitespace(attrs.get('id', ""))
-            self.list.append(id)
+            id = str( normalize_whitespace(attrs.get('id', "")) )
+            if self.useShelve:
+              self.list[id] = id
+            else:
+              self.list.add(id)
 
         elif name == 'version_number':
             self.inVersionNoContent = 1
@@ -285,13 +352,14 @@ class FatalCheckerError(Exception):
 #======================
 class CFChecker:
     
-  def __init__(self, uploader=None, useFileName="yes", badc=None, coards=None, cfStandardNamesXML=STANDARDNAME, cfAreaTypesXML=AREATYPES, version=newest_version, debug=False, silent=False):
+  def __init__(self, uploader=None, useFileName="yes", badc=None, coards=None, cfStandardNamesXML=STANDARDNAME, cfAreaTypesXML=AREATYPES, cacheTables=False, version=newest_version, debug=False, silent=False):
       self.uploader = uploader
       self.useFileName = useFileName
       self.badc = badc
       self.coards = coards
       self.standardNames = cfStandardNamesXML
       self.areaTypes = cfAreaTypesXML
+      self.cacheTables = cacheTables
       self.version = version
       self.all_results = OrderedDict()  # dictonary of results sorted by file and then by globals / variable 
                                         # and then by category
@@ -346,15 +414,17 @@ class CFChecker:
     # Set up dictionary of standard_names and their assoc. units
     parser = make_parser()
     parser.setFeature(feature_namespaces, 0)
-    self.std_name_dh = ConstructDict()
-    parser.setContentHandler(self.std_name_dh)
-    parser.parse(self.standardNames)
+    self.std_name_dh = ConstructDict(useShelve=self.cacheTables)
+    if not self.std_name_dh.current:       
+      parser.setContentHandler(self.std_name_dh)
+      parser.parse(self.standardNames)
 
     if self.version >= vn1_4:
         # Set up list of valid area_types
-        self.area_type_lh = ConstructList()
-        parser.setContentHandler(self.area_type_lh)
-        parser.parse(self.areaTypes)
+        self.area_type_lh = ConstructList(useShelve=self.cacheTables)
+        if not self.area_type_lh.current:       
+          parser.setContentHandler(self.area_type_lh)
+          parser.parse(self.areaTypes)
     
     self._add_version("Using CF Checker Version %s" % __version__)
     if not self.version:
@@ -376,6 +446,8 @@ class CFChecker:
         return self._checker()
     finally:
         self.f.close()
+        self.std_name_dh.close()
+        self.area_type_lh.close()
 
   def _init_results(self, filename):
         """
@@ -2461,6 +2533,8 @@ def getargs(arglist):
     coards=None
     version=newest_version
     debug = False
+    # cacheTables : introduced to enable caching of CF standard name and area type tables.
+    cacheTables = False
     
     # set to environment variables
     if environ.has_key(standardnamekey):
@@ -2469,7 +2543,7 @@ def getargs(arglist):
         areatypes=environ[areatypeskey]
 
     try:
-        (opts,args)=getopt(arglist[1:],'a:bcdhlns:v:',['area_types=','badc','coards','help','uploader','noname','cf_standard_names=','version=', 'debug'])
+        (opts,args)=getopt(arglist[1:],'a:bcdhlns:v:x',['area_types=','badc','coards','help','uploader','noname','cf_standard_names=','version=', 'debug', 'cache_tables'])
     except GetoptError:
         stderr.write('%s\n'%__doc__)
         exit(1)
@@ -2496,6 +2570,9 @@ def getargs(arglist):
         if a in ('-n','--noname'):
             useFileName="no"
             continue
+        if a in ('-x','--cache_tables'):
+            cacheTables = True
+            continue
         if a in ('-s','--cf_standard_names'):
             standardname=v.strip()
             continue
@@ -2518,14 +2595,14 @@ def getargs(arglist):
         stderr.write('ERROR in command line\n\nusage:\n%s\n'%__doc__)
         exit(1)
 
-    return (badc,coards,uploader,useFileName,standardname,areatypes,version,args,debug)
+    return (badc,coards,uploader,useFileName,standardname,areatypes,cacheTables,version,args,debug)
 
 
 def main():
 
-    (badc,coards,uploader,useFileName,standardName,areaTypes,version,files,debug)=getargs(sys.argv)
+    (badc,coards,uploader,useFileName,standardName,areaTypes,cacheTables,version,files,debug)=getargs(sys.argv)
     
-    inst = CFChecker(uploader=uploader, useFileName=useFileName, badc=badc, coards=coards, cfStandardNamesXML=standardName, cfAreaTypesXML=areaTypes, version=version, debug=debug)
+    inst = CFChecker(uploader=uploader, useFileName=useFileName, badc=badc, coards=coards, cfStandardNamesXML=standardName, cfAreaTypesXML=areaTypes, cacheTables=cacheTables, version=version, debug=debug)
     for file in files:
         #print
         try:

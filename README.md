@@ -2,6 +2,8 @@
 
 The CF Checker is a utility that checks the contents of a NetCDF file complies with the Climate and Forecasts (CF) Metadata Convention.
 
+This branch includes modifications to enable caching of the CF Standard Name table and Area Type table, resulting in reduced execution time.
+
 ## Prerequisites
 
 * [Python 2.6](https://www.python.org/) or newer (not yet tested with Python 3.x)
@@ -14,21 +16,17 @@ The CF Checker is a utility that checks the contents of a NetCDF file complies w
 
 ## Installation
 
-To install from [PyPI](https://pypi.python.org/pypi/cfchecker):
+To install from [PyPI]: not supported
 
-    pip install cfchecker
 
 Alternatively, to install from source:
 
 1. Download the cfchecker package from [cfchecker releases](https://github.com/cedadev/cf-checker/releases)
 
-2. Unpack the library:
+e.g. git clone -b table_caching https://github.com/cedadev/cf-checker
 
-        tar -zxf cfchecker-${version}.tar.gz
 
-        cd cfchecker-${version}
-
-3. Install the package:
+2. Install the package:
 
    * To install to a central location:
 
@@ -40,9 +38,13 @@ Alternatively, to install from source:
 
      If directory you are installing into is not on PYTHONPATH you will need to add it.
      
-## Running the CF Checker
+## Running the table_caching CF Checker (executable name is change from cfchecks to cfchex)
 
-`cfchecks [-a|--area_types area_types.xml] [-s|--cf_standard_names standard_names.xml] [-v|--version CFVersion] file1 [file2...]`
+`cfchex [-a|--area_types area_types.xml] [-s|--cf_standard_names standard_names.xml] [-x|--cache_standard_names] [-v|--version CFVersion] file1 [file2...]`
+
+## Cached tables
+
+The tables are stored in /tmp/cfexpr_cache and /tmp/cfexpr_cachel . They will be over-written if they are more than 600 seconds old.
 
 ### Environment Variables
 
