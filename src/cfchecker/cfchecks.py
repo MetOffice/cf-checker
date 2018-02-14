@@ -150,9 +150,9 @@ class ConstructDict(ContentHandler):
           else:
             self.current = False
           if self.current:
-            self.dict['__contentTime__'] = now
-          else:
             self.version_number,self.last_modified = self.dict['__info__']
+          else:
+            self.dict['__contentTime__'] = now
 
         else:
           self.dict = {}
