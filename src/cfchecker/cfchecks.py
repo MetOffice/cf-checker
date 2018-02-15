@@ -1833,6 +1833,7 @@ class CFChecker:
 
 
         (stdName,modifier) = self.getStdName(var)
+        stdName=stdName.encode('ascii')
         
         if not self.alias.has_key(stdName):
             self._add_error("No formula defined for standard name: %s" % stdName, varName, code="4.3.2")
@@ -1907,6 +1908,7 @@ class CFChecker:
               # be consistent with units given in standard_name table
               if hasattr(var, 'standard_name'):
                   (stdName,modifier) = self.getStdName(var)
+                  stdName=stdName.encode('ascii')
 
                   # Is the Standard Name modifier number_of_observations being used.
                   if modifier == 'number_of_observations':
