@@ -141,7 +141,7 @@ class ConstructDict(ContentHandler):
           else:
             self.shFile = shelveFile
           now = time.time()
-          exists = os.path.isfile( self.shFile )
+          exists = os.path.isfile( self.shFile ) or os.path.isfile( '%s.dat' % self.shFile )
           self.dict = shelve.open( self.shFile )
 
           if exists:
@@ -249,7 +249,7 @@ class ConstructList(ContentHandler):
           else:
             self.shFile = shelveFile
           now = time.time()
-          exists = os.path.isfile( self.shFile )
+          exists = os.path.isfile( self.shFile ) or os.path.isfile( '%s.dat' % self.shFile )
           self.list = shelve.open( self.shFile )
 
           if exists:
