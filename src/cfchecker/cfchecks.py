@@ -15,7 +15,7 @@
 # CF Checker Version: See __version__
 #
 #-------------------------------------------------------------
-''' cfchecker [-a|--area_types area_types.xml] ['-x'|'--cache_tables'] [-s|--cf_standard_names standard_names.xml] [-v|--version CFVersion] file1 [file2...]
+''' cfchecker [-a|--area_types area_types.xml] ['-x'|'--cache_tables'] ['-t'|'--cache_time_days' <days>] [-s|--cf_standard_names standard_names.xml] [-v|--version CFVersion] file1 [file2...]
 
 Description:
  The cfchecker checks NetCDF files for compliance to the CF standard.
@@ -30,6 +30,8 @@ Options:
  -h or --help: Prints this help text.
     
  -x or --cache_tables: cache the standard name and area type tables.
+
+ -t or --cache_time_days <days>: set the cache retention period in days [default 10 days].
 
  -v or --version: CF version to check against, use auto to auto-detect the file version.
 
@@ -126,7 +128,7 @@ class ConstructDict(ContentHandler):
        If useShelve is True, a python shelve file will be used. If the file is present and less than 600 seconds old, the
        existing contents will be used, otherwise the standard name table will be parsed and written to the shelf file.
     """
-    def __init__(self,useShelve=False,shelveFile=None):
+    def __init__(self,useShelve=False,shelveFile=None,cacheTime=0):
         self.inUnitsContent = 0
         self.inEntryIdContent = 0
         self.inVersionNoContent = 0
@@ -146,7 +148,7 @@ class ConstructDict(ContentHandler):
 
           if exists:
             ctime = self.dict['__contentTime__']
-            self.current = (now-ctime) < 600
+            self.current = (now-ctime) < cacheTime
           else:
             self.current = False
           if self.current:
@@ -236,7 +238,7 @@ class ConstructList(ContentHandler):
     """Parse the xml area_type table, reading all area_types 
        into a list.
     """
-    def __init__(self,useShelve=False,shelveFile=None):
+    def __init__(self,useShelve=False,shelveFile=None,cacheTime=0):
         self.inVersionNoContent = 0
         self.inLastModifiedContent = 0
         self.current = False
@@ -254,7 +256,7 @@ class ConstructList(ContentHandler):
 
           if exists:
             ctime = self.list['__contentTime__']
-            self.current = (now-ctime) < 600
+            self.current = (now-ctime) < cacheTime
           else:
             self.current = False
           if self.current:
@@ -354,7 +356,7 @@ class FatalCheckerError(Exception):
 #======================
 class CFChecker:
     
-  def __init__(self, uploader=None, useFileName="yes", badc=None, coards=None, cfStandardNamesXML=STANDARDNAME, cfAreaTypesXML=AREATYPES, cacheTables=False, version=newest_version, debug=False, silent=False):
+  def __init__(self, uploader=None, useFileName="yes", badc=None, coards=None, cfStandardNamesXML=STANDARDNAME, cfAreaTypesXML=AREATYPES, cacheTables=False, cacheTime=0, version=newest_version, debug=False, silent=False):
       self.uploader = uploader
       self.useFileName = useFileName
       self.badc = badc
@@ -362,6 +364,7 @@ class CFChecker:
       self.standardNames = cfStandardNamesXML
       self.areaTypes = cfAreaTypesXML
       self.cacheTables = cacheTables
+      self.cacheTime = cacheTime
       self.version = version
       self.all_results = OrderedDict()  # dictonary of results sorted by file and then by globals / variable 
                                         # and then by category
@@ -416,14 +419,14 @@ class CFChecker:
     # Set up dictionary of standard_names and their assoc. units
     parser = make_parser()
     parser.setFeature(feature_namespaces, 0)
-    self.std_name_dh = ConstructDict(useShelve=self.cacheTables)
+    self.std_name_dh = ConstructDict(useShelve=self.cacheTables,cacheTime=self.cacheTime)
     if not self.std_name_dh.current:       
       parser.setContentHandler(self.std_name_dh)
       parser.parse(self.standardNames)
 
     if self.version >= vn1_4:
         # Set up list of valid area_types
-        self.area_type_lh = ConstructList(useShelve=self.cacheTables)
+        self.area_type_lh = ConstructList(useShelve=self.cacheTables,cacheTime=self.cacheTime)
         if not self.area_type_lh.current:       
           parser.setContentHandler(self.area_type_lh)
           parser.parse(self.areaTypes)
@@ -2539,6 +2542,8 @@ def getargs(arglist):
     debug = False
     # cacheTables : introduced to enable caching of CF standard name and area type tables.
     cacheTables = False
+    # default cache longevity is 10 days
+    cacheTime = 24*36000
     
     # set to environment variables
     if environ.has_key(standardnamekey):
@@ -2547,7 +2552,7 @@ def getargs(arglist):
         areatypes=environ[areatypeskey]
 
     try:
-        (opts,args)=getopt(arglist[1:],'a:bcdhlns:v:x',['area_types=','badc','coards','help','uploader','noname','cf_standard_names=','version=', 'debug', 'cache_tables'])
+        (opts,args)=getopt(arglist[1:],'a:bcdhlns:v:xt:',['area_types=','badc','coards','help','uploader','noname','cf_standard_names=','version=', 'debug', 'cache_tables', 'cache_time_days='])
     except GetoptError:
         stderr.write('%s\n'%__doc__)
         exit(1)
@@ -2577,6 +2582,9 @@ def getargs(arglist):
         if a in ('-x','--cache_tables'):
             cacheTables = True
             continue
+        if a in ('-t','--cache_time_days'):
+            cacheTime = float(v)*24*3600
+            continue
         if a in ('-s','--cf_standard_names'):
             standardname=v.strip()
             continue
@@ -2599,14 +2607,14 @@ def getargs(arglist):
         stderr.write('ERROR in command line\n\nusage:\n%s\n'%__doc__)
         exit(1)
 
-    return (badc,coards,uploader,useFileName,standardname,areatypes,cacheTables,version,args,debug)
+    return (badc,coards,uploader,useFileName,standardname,areatypes,cacheTables,cacheTime,version,args,debug)
 
 
 def main():
 
-    (badc,coards,uploader,useFileName,standardName,areaTypes,cacheTables,version,files,debug)=getargs(sys.argv)
+    (badc,coards,uploader,useFileName,standardName,areaTypes,cacheTables,cacheTime,version,files,debug)=getargs(sys.argv)
     
-    inst = CFChecker(uploader=uploader, useFileName=useFileName, badc=badc, coards=coards, cfStandardNamesXML=standardName, cfAreaTypesXML=areaTypes, cacheTables=cacheTables, version=version, debug=debug)
+    inst = CFChecker(uploader=uploader, useFileName=useFileName, badc=badc, coards=coards, cfStandardNamesXML=standardName, cfAreaTypesXML=areaTypes, cacheTables=cacheTables, cacheTime=cacheTime, version=version, debug=debug)
     for file in files:
         #print
         try:

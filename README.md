@@ -41,11 +41,11 @@ e.g. git clone -b table_caching https://github.com/cedadev/cf-checker
      
 ## Running the table_caching CF Checker (executable name is change from cfchecks to cfchex)
 
-`cfchex [-a|--area_types area_types.xml] [-s|--cf_standard_names standard_names.xml] [-x|--cache_standard_names] [-v|--version CFVersion] file1 [file2...]`
+`cfchex [-a|--area_types area_types.xml] [-s|--cf_standard_names standard_names.xml] [-x|--cache_tables] -[-d|--cache_time_days <days>] [-v|--version CFVersion] file1 [file2...]`
 
 ## Cached tables
 
-The tables are stored in /tmp/cfexpr_cache and /tmp/cfexpr_cachel . They will be over-written if they are more than 600 seconds old.
+The tables are stored in /tmp/cfexpr_cache and /tmp/cfexpr_cachel . They will be over-written if they are more than 10 days old. The retention period can be changed by adding "-t <days>" in the command line. 
 
 ### Environment Variables
 
