@@ -65,7 +65,10 @@ from operator import mul
 # Version is imported from the package module cfchecker/__init__.py
 from cfchecker import __version__
 
-STANDARDNAME = 'http://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml'
+# point to local cache of URL
+# http://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml
+STANDARDNAME = '/home/h03/support/software/cfchecker_rhel7/etc/cf-standard-name-table.xml'
+
 AREATYPES = 'http://cfconventions.org/Data/area-type-table/current/src/area-type-table.xml'
 REGIONNAMES = 'http://cfconventions.org/Data/cf-standard-names/docs/standardized-region-names.xml'
 
@@ -442,6 +445,7 @@ class CFChecker:
                                      cacheDir=self.cacheDir)
     if not self.std_name_dh.current:       
       parser.setContentHandler(self.std_name_dh)
+      print('Parsing standard names file {0}'.format(self.standardNames))
       parser.parse(self.standardNames)
 
     if self.version >= vn1_4:
@@ -3031,7 +3035,8 @@ def getargs(arglist):
 
 
 def main():
-
+    print('called with the following args')
+    print(sys.argv)
     (badc,coards,debug,uploader,useFileName,regionnames,standardName,areaTypes,cacheDir,cacheTables,cacheTime,version,files)=getargs(sys.argv)
     
     inst = CFChecker(uploader=uploader,
@@ -3078,5 +3083,5 @@ def main():
 #--------------------------
 
 if __name__ == '__main__':
-
+    print(sys.argv)
     main()

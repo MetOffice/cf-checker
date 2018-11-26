@@ -69,7 +69,11 @@ class CfchecksWrapper(object):
     def __init__(self,
                  spool_dir = '/var/spool/cf-checker',
                  standard_names_key = 'CF_STANDARD_NAMES',
-                 standard_names_url = 'http://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml',
+
+                 # point to local cache of URL
+                 # http://cfconventions.org/Data/cf-standard-names/current/src/cf-standard-name-table.xml
+                 standard_names_url='/home/h03/support/software/cfchecker_rhel7/etc/cf-standard-name-table.xml',
+
                  area_types_key = 'CF_AREA_TYPES',
                  area_types_url = 'http://cfconventions.org/Data/area-type-table/current/src/area-type-table.xml',
                  udunits_key = 'UDUNITS',
@@ -258,6 +262,7 @@ class CfchecksWrapper(object):
                    "-s", self.standard_names_path,
                    "-a", self.area_types_path,
                    "-u", self.udunits_path]
+        print('running command:\n{0}'.format(' '.join(command)))
         if cf_version:
             command += ["-v", cf_version]
         command.append(data_file)
@@ -276,10 +281,11 @@ class CfchecksWrapper(object):
         # for clarity, flush before running command
         sys.stdout.flush()
         sys.stderr.flush()
+        print('running command:\n{0}'.format(' '.join(command)))
         return subprocess.call(command)
 
 
 if __name__ == '__main__':
-
+    print('starting cfchecker')
     w = CfchecksWrapper()
     w.main()
