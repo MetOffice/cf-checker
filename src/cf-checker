@@ -75,7 +75,9 @@ class CfchecksWrapper(object):
                  standard_names_url='/home/h03/support/software/cfchecker_rhel7/etc/cf-standard-name-table.xml',
 
                  area_types_key = 'CF_AREA_TYPES',
-                 area_types_url = 'http://cfconventions.org/Data/area-type-table/current/src/area-type-table.xml',
+                 # point to local cache of URL
+                 # http://cfconventions.org/Data/area-type-table/current/src/area-type-table.xml
+                 area_types_url = '/home/h03/support/software/cfchecker_rhel7/etc/area-type-table.xml',
                  udunits_key = 'UDUNITS',
                  udunits_path = '/usr/share/udunits/udunits2.xml',
                  checker_command = 'cfchecks',
