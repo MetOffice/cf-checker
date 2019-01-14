@@ -3037,8 +3037,9 @@ def getargs(arglist):
 
 
 def main():
-    print('called with the following args')
-    print(sys.argv)
+    print('Running Met Office fork of cf-checker.')
+    # print('called with the following args')
+    # print(sys.argv)
     (badc,coards,debug,uploader,useFileName,regionnames,standardName,areaTypes,cacheDir,cacheTables,cacheTime,version,files)=getargs(sys.argv)
     
     inst = CFChecker(uploader=uploader,
